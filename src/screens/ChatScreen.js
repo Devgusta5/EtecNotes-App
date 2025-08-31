@@ -13,6 +13,7 @@ import {
   Dimensions,
 } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
+import { useTheme } from "../context/ThemeContext"
 
 const { width } = Dimensions.get("window")
 
@@ -27,6 +28,7 @@ export default function ChatScreen() {
   ])
   const [inputText, setInputText] = useState("")
   const scrollViewRef = useRef()
+  const { theme } = useTheme()
 
   const sendMessage = () => {
     if (!inputText.trim()) return
@@ -58,16 +60,22 @@ export default function ChatScreen() {
   }, [messages])
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.title}>IATEC</Text>
+      <View style={[styles.header, { backgroundColor: theme.colors.surface }]}>
+        <Text style={[styles.title, { color: theme.colors.primary }]}>IATEC</Text>
         <View style={styles.headerButtons}>
-          <TouchableOpacity style={styles.headerButton}>
-            <Ionicons name="restaurant" size={20} color="#9CA3AF" />
+          <TouchableOpacity style={[styles.headerButton, { backgroundColor: theme.colors.surfaceSecondary }]}>
+            <Ionicons name="restaurant" size={20} color={theme.colors.textSecondary} />
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.headerButton, styles.headerButtonActive]}>
-            <Ionicons name="fitness" size={20} color="#8B5CF6" />
+          <TouchableOpacity
+            style={[
+              styles.headerButton,
+              styles.headerButtonActive,
+              { backgroundColor: theme.colors.primaryLight + "20" },
+            ]}
+          >
+            <Ionicons name="fitness" size={20} color={theme.colors.primary} />
           </TouchableOpacity>
         </View>
       </View>
@@ -84,28 +92,47 @@ export default function ChatScreen() {
             key={message.id}
             style={[styles.messageContainer, message.isBot ? styles.botMessage : styles.userMessage]}
           >
-            <View style={[styles.messageBubble, message.isBot ? styles.botBubble : styles.userBubble]}>
-              <Text style={[styles.messageText, message.isBot ? styles.botText : styles.userText]}>{message.text}</Text>
+            <View
+              style={[
+                styles.messageBubble,
+                message.isBot
+                  ? [styles.botBubble, { backgroundColor: theme.colors.surfaceSecondary }]
+                  : [styles.userBubble, { backgroundColor: theme.colors.primary }],
+              ]}
+            >
+              <Text
+                style={[
+                  styles.messageText,
+                  message.isBot ? [styles.botText, { color: theme.colors.text }] : styles.userText,
+                ]}
+              >
+                {message.text}
+              </Text>
             </View>
           </View>
         ))}
       </ScrollView>
 
       {/* Input Area */}
-      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.inputContainer}>
-        <View style={styles.inputWrapper}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={[styles.inputContainer, { backgroundColor: theme.colors.surface }]}
+      >
+        <View
+          style={[styles.inputWrapper, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}
+        >
           <TouchableOpacity style={styles.inputButton}>
-            <Ionicons name="attach" size={20} color="#8B5CF6" />
+            <Ionicons name="attach" size={20} color={theme.colors.primary} />
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.inputButton}>
-            <Ionicons name="camera" size={20} color="#8B5CF6" />
+            <Ionicons name="camera" size={20} color={theme.colors.primary} />
           </TouchableOpacity>
 
           <TextInput
-            style={styles.textInput}
+            style={[styles.textInput, { color: theme.colors.text }]}
             placeholder="Digite sua mensagem..."
-            placeholderTextColor="#9CA3AF"
+            placeholderTextColor={theme.colors.textSecondary}
             value={inputText}
             onChangeText={setInputText}
             multiline
@@ -113,15 +140,15 @@ export default function ChatScreen() {
           />
 
           <TouchableOpacity style={styles.inputButton}>
-            <Ionicons name="mic" size={20} color="#8B5CF6" />
+            <Ionicons name="mic" size={20} color={theme.colors.primary} />
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.sendButton} onPress={sendMessage}>
-            <Ionicons name="send" size={20} color="#8B5CF6" />
+            <Ionicons name="send" size={20} color={theme.colors.primary} />
           </TouchableOpacity>
         </View>
 
-        <TouchableOpacity style={styles.quickReplyButton}>
+        <TouchableOpacity style={[styles.quickReplyButton, { backgroundColor: theme.colors.primary }]}>
           <Text style={styles.quickReplyText}>Oi</Text>
         </TouchableOpacity>
       </KeyboardAvoidingView>
@@ -132,7 +159,6 @@ export default function ChatScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F8F9FA",
   },
   header: {
     flexDirection: "row",
@@ -141,12 +167,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop: 60,
     paddingBottom: 20,
-    backgroundColor: "#FFFFFF",
   },
   title: {
     fontSize: 24,
     fontWeight: "bold",
-    color: "#8B5CF6",
   },
   headerButtons: {
     flexDirection: "row",
@@ -156,7 +180,6 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 12,
-    backgroundColor: "#F3F4F6",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -186,11 +209,9 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   botBubble: {
-    backgroundColor: "#E5E7EB",
     borderBottomLeftRadius: 4,
   },
   userBubble: {
-    backgroundColor: "#8B5CF6",
     borderBottomRightRadius: 4,
   },
   messageText: {
@@ -198,13 +219,12 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   botText: {
-    color: "#374151",
+    // Color will be set dynamically
   },
   userText: {
     color: "#FFFFFF",
   },
   inputContainer: {
-    backgroundColor: "#FFFFFF",
     paddingHorizontal: 24,
     paddingVertical: 16,
     paddingBottom: 32,
@@ -212,13 +232,11 @@ const styles = StyleSheet.create({
   inputWrapper: {
     flexDirection: "row",
     alignItems: "flex-end",
-    backgroundColor: "#F9FAFB",
     borderRadius: 24,
     paddingHorizontal: 16,
     paddingVertical: 12,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: "#E5E7EB",
   },
   inputButton: {
     marginHorizontal: 4,
@@ -226,7 +244,6 @@ const styles = StyleSheet.create({
   textInput: {
     flex: 1,
     fontSize: 16,
-    color: "#374151",
     marginHorizontal: 12,
     maxHeight: 100,
   },
@@ -235,7 +252,6 @@ const styles = StyleSheet.create({
   },
   quickReplyButton: {
     alignSelf: "flex-end",
-    backgroundColor: "#8B5CF6",
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 20,

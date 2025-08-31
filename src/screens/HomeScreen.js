@@ -1,26 +1,247 @@
 "use client"
-import { useState } from "react"
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions } from "react-native"
+import { useState, useRef, useEffect } from "react"
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions, Animated, PanResponder } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
+import { useTheme } from "../context/ThemeContext"
 
 const { width } = Dimensions.get("window")
 
+const createStyles = (theme) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: theme.colors.background,
+    },
+    header: {
+      paddingHorizontal: 24,
+      paddingTop: 60,
+      paddingBottom: 20,
+      backgroundColor: theme.colors.surface,
+    },
+    title: {
+      fontSize: 32,
+      fontWeight: "bold",
+      color: theme.colors.text,
+    },
+    tabContainer: {
+      flexDirection: "row",
+      backgroundColor: theme.colors.surface,
+      paddingHorizontal: 24,
+      paddingBottom: 16,
+    },
+    tab: {
+      flex: 1,
+      alignItems: "center",
+      paddingVertical: 12,
+      marginHorizontal: 4,
+      borderRadius: 8,
+    },
+    activeTab: {
+      backgroundColor: theme.colors.primary + "20",
+    },
+    tabText: {
+      fontSize: 16,
+      fontWeight: "500",
+      color: theme.colors.textSecondary,
+    },
+    activeTabText: {
+      color: theme.colors.primary,
+      fontWeight: "600",
+    },
+    content: {
+      flex: 1,
+    },
+    contentContainer: {
+      flex: 1,
+      overflow: "hidden",
+      backgroundColor: theme.colors.background,
+    },
+    tabContentContainer: {
+      padding: 24,
+      paddingBottom: 100,
+    },
+    contentTitle: {
+      fontSize: 28,
+      fontWeight: "bold",
+      color: theme.colors.primary,
+      marginBottom: 24,
+    },
+    journalImageContainer: {
+      alignItems: "center",
+      marginBottom: 24,
+    },
+    journalImagePlaceholder: {
+      width: "100%",
+      height: 200,
+      borderRadius: 16,
+      alignItems: "center",
+      justifyContent: "center",
+      marginBottom: 16,
+    },
+    journalDescription: {
+      fontSize: 16,
+      lineHeight: 24,
+      textAlign: "justify",
+    },
+    patchNotesContainer: {
+      gap: 16,
+    },
+    patchNoteCard: {
+      borderRadius: 16,
+      padding: 20,
+    },
+    patchVersion: {
+      fontSize: 18,
+      fontWeight: "bold",
+      marginBottom: 12,
+    },
+    patchItem: {
+      fontSize: 16,
+      marginBottom: 8,
+      lineHeight: 22,
+    },
+    eventsContainer: {
+      gap: 20,
+    },
+    eventCard: {
+      borderRadius: 16,
+      padding: 20,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 8,
+      elevation: 3,
+    },
+    eventImageContainer: {
+      alignItems: "center",
+      marginBottom: 16,
+    },
+    eventImagePlaceholder: {
+      width: "100%",
+      height: 120,
+      borderRadius: 12,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    eventContent: {
+      alignItems: "center",
+    },
+    eventTitle: {
+      fontSize: 20,
+      fontWeight: "bold",
+      marginBottom: 8,
+      textAlign: "center",
+    },
+    eventDate: {
+      fontSize: 16,
+      marginBottom: 12,
+      fontWeight: "500",
+    },
+    eventDescription: {
+      fontSize: 16,
+      textAlign: "center",
+      lineHeight: 22,
+    },
+  })
+
 export default function HomeScreen({ navigation }) {
   const [activeTab, setActiveTab] = useState("Jornal")
-
+  const { theme } = useTheme()
+  const panX = useRef(new Animated.Value(0)).current
   const tabs = ["Jornal", "Patch", "Eventos"]
+
+  const switchTab = (tabName) => {
+    const index = tabs.indexOf(tabName)
+    setActiveTab(tabName)
+    Animated.spring(panX, {
+      toValue: -index * width,
+      tension: 68,
+      friction: 12,
+      useNativeDriver: true,
+    }).start()
+  }
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        return Math.abs(gestureState.dx) > 5 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy)
+      },
+      onPanResponderGrant: () => {
+        panX.stopAnimation()
+        panX.extractOffset()
+      },
+      onPanResponderMove: (_, gestureState) => {
+        const currentIndex = tabs.indexOf(activeTab)
+        const newValue = -currentIndex * width + gestureState.dx
+        panX.setValue(newValue)
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        const currentIndex = tabs.indexOf(activeTab)
+        let newIndex = currentIndex
+
+        // Calcula a velocidade e direção do swipe
+        const velocity = Math.abs(gestureState.vx)
+        const isQuickSwipe = velocity > 0.3
+        const distance = Math.abs(gestureState.dx)
+        const direction = gestureState.dx > 0 ? -1 : 1
+
+        // Decide se deve mudar de tab baseado na velocidade ou distância
+        if ((isQuickSwipe || distance > width * 0.2) && gestureState.dx !== 0) {
+          newIndex = Math.max(0, Math.min(tabs.length - 1, currentIndex + direction))
+        }
+
+        Animated.spring(panX, {
+          toValue: -newIndex * width,
+          tension: 75,
+          friction: 15,
+          useNativeDriver: true,
+        }).start(() => {
+          setActiveTab(tabs[newIndex])
+        })
+      },
+    })
+  ).current
+
+  const renderContent = () => (
+    <Animated.View
+      style={[
+        createStyles(theme).contentContainer,
+        {
+          flexDirection: "row",
+          width: width * tabs.length,
+          transform: [{ translateX: panX }],
+        },
+      ]}
+      {...panResponder.panHandlers}
+    >
+      {tabs.map((tab) => (
+        <View key={tab} style={{ width }}>
+          <ScrollView 
+            style={createStyles(theme).tabContentContainer}
+            showsVerticalScrollIndicator={false}
+            scrollEventThrottle={16}
+          >
+            <Text style={createStyles(theme).contentTitle}>{tabContent[tab].title}</Text>
+            {tabContent[tab].content}
+          </ScrollView>
+        </View>
+      ))}
+    </Animated.View>
+  )
 
   const tabContent = {
     Jornal: {
       title: "Semana Tecnológica",
       content: (
         <View>
-          <View style={styles.journalImageContainer}>
-            <View style={styles.journalImagePlaceholder}>
-              <Ionicons name="newspaper" size={48} color="#8B5CF6" />
+          <View style={createStyles(theme).journalImageContainer}>
+            <View
+              style={[createStyles(theme).journalImagePlaceholder, { backgroundColor: theme.colors.surfaceSecondary }]}
+            >
+              <Ionicons name="newspaper" size={48} color={theme.colors.primary} />
             </View>
           </View>
-          <Text style={styles.journalDescription}>
+          <Text style={[createStyles(theme).journalDescription, { color: theme.colors.text }]}>
             O Jornal Etec é um periódico voltado para a divulgação de notícias, eventos e atividades da Etec (Escola
             Técnica Estadual). Seu objetivo é manter alunos, professores e a comunidade escolar atualizados sobre o que
             acontece dentro da instituição, além de abordar temas relevantes para o ambiente educacional. O jornal traz
@@ -32,23 +253,41 @@ export default function HomeScreen({ navigation }) {
     Patch: {
       title: "Patch Notes",
       content: (
-        <View style={styles.patchNotesContainer}>
-          <View style={styles.patchNoteCard}>
-            <Text style={styles.patchVersion}>Versão 1.2.0 - Abril 2025</Text>
-            <Text style={styles.patchItem}>• Novo layout para a aba de Eventos.</Text>
-            <Text style={styles.patchItem}>• Animação adicionada nos ícones da Tab Bar.</Text>
-            <Text style={styles.patchItem}>• Correções de bugs menores e melhorias de desempenho.</Text>
+        <View style={createStyles(theme).patchNotesContainer}>
+          <View style={[createStyles(theme).patchNoteCard, { backgroundColor: theme.colors.primary + "20" }]}>
+            <Text style={[createStyles(theme).patchVersion, { color: theme.colors.text }]}>
+              Versão 1.2.0 - Abril 2025
+            </Text>
+            <Text style={[createStyles(theme).patchItem, { color: theme.colors.textSecondary }]}>
+              • Novo layout para a aba de Eventos.
+            </Text>
+            <Text style={[createStyles(theme).patchItem, { color: theme.colors.textSecondary }]}>
+              • Animação adicionada nos ícones da Tab Bar.
+            </Text>
+            <Text style={[createStyles(theme).patchItem, { color: theme.colors.textSecondary }]}>
+              • Correções de bugs menores e melhorias de desempenho.
+            </Text>
           </View>
 
-          <View style={styles.patchNoteCard}>
-            <Text style={styles.patchVersion}>Versão 1.1.0 - Março 2025</Text>
-            <Text style={styles.patchItem}>• Tela de Chat adicionada.</Text>
-            <Text style={styles.patchItem}>• Integração com o sistema de IAT.</Text>
+          <View style={[createStyles(theme).patchNoteCard, { backgroundColor: theme.colors.primary + "20" }]}>
+            <Text style={[createStyles(theme).patchVersion, { color: theme.colors.text }]}>
+              Versão 1.1.0 - Março 2025
+            </Text>
+            <Text style={[createStyles(theme).patchItem, { color: theme.colors.textSecondary }]}>
+              • Tela de Chat adicionada.
+            </Text>
+            <Text style={[createStyles(theme).patchItem, { color: theme.colors.textSecondary }]}>
+              • Integração com o sistema de IAT.
+            </Text>
           </View>
 
-          <View style={styles.patchNoteCard}>
-            <Text style={styles.patchVersion}>Versão 1.0.0 - Fevereiro 2025</Text>
-            <Text style={styles.patchItem}>• Lançamento inicial do app!</Text>
+          <View style={[createStyles(theme).patchNoteCard, { backgroundColor: theme.colors.primary + "20" }]}>
+            <Text style={[createStyles(theme).patchVersion, { color: theme.colors.text }]}>
+              Versão 1.0.0 - Fevereiro 2025
+            </Text>
+            <Text style={[createStyles(theme).patchItem, { color: theme.colors.textSecondary }]}>
+              • Lançamento inicial do app!
+            </Text>
           </View>
         </View>
       ),
@@ -56,30 +295,38 @@ export default function HomeScreen({ navigation }) {
     Eventos: {
       title: "Eventos",
       content: (
-        <View style={styles.eventsContainer}>
-          <View style={styles.eventCard}>
-            <View style={styles.eventImageContainer}>
-              <View style={styles.eventImagePlaceholder}>
-                <Ionicons name="school" size={32} color="#8B5CF6" />
+        <View style={createStyles(theme).eventsContainer}>
+          <View style={[createStyles(theme).eventCard, { backgroundColor: theme.colors.surface }]}>
+            <View style={createStyles(theme).eventImageContainer}>
+              <View
+                style={[createStyles(theme).eventImagePlaceholder, { backgroundColor: theme.colors.surfaceSecondary }]}
+              >
+                <Ionicons name="school" size={32} color={theme.colors.primary} />
               </View>
             </View>
-            <View style={styles.eventContent}>
-              <Text style={styles.eventTitle}>Semana Tecnológica</Text>
-              <Text style={styles.eventDate}>10 a 14 de Abril de 2025</Text>
-              <Text style={styles.eventDescription}>Workshops, palestras e desafios para os alunos da Etec.</Text>
+            <View style={createStyles(theme).eventContent}>
+              <Text style={[createStyles(theme).eventTitle, { color: theme.colors.text }]}>Semana Tecnológica</Text>
+              <Text style={[createStyles(theme).eventDate, { color: theme.colors.primary }]}>
+                10 a 14 de Abril de 2025
+              </Text>
+              <Text style={[createStyles(theme).eventDescription, { color: theme.colors.textSecondary }]}>
+                Workshops, palestras e desafios para os alunos da Etec.
+              </Text>
             </View>
           </View>
 
-          <View style={styles.eventCard}>
-            <View style={styles.eventImageContainer}>
-              <View style={styles.eventImagePlaceholder}>
-                <Ionicons name="briefcase" size={32} color="#8B5CF6" />
+          <View style={[createStyles(theme).eventCard, { backgroundColor: theme.colors.surface }]}>
+            <View style={createStyles(theme).eventImageContainer}>
+              <View
+                style={[createStyles(theme).eventImagePlaceholder, { backgroundColor: theme.colors.surfaceSecondary }]}
+              >
+                <Ionicons name="briefcase" size={32} color={theme.colors.primary} />
               </View>
             </View>
-            <View style={styles.eventContent}>
-              <Text style={styles.eventTitle}>Feira de Profissões</Text>
-              <Text style={styles.eventDate}>Em breve</Text>
-              <Text style={styles.eventDescription}>
+            <View style={createStyles(theme).eventContent}>
+              <Text style={[createStyles(theme).eventTitle, { color: theme.colors.text }]}>Feira de Profissões</Text>
+              <Text style={[createStyles(theme).eventDate, { color: theme.colors.primary }]}>Em breve</Text>
+              <Text style={[createStyles(theme).eventDescription, { color: theme.colors.textSecondary }]}>
                 Conheça as diferentes áreas profissionais e oportunidades de carreira.
               </Text>
             </View>
@@ -89,171 +336,32 @@ export default function HomeScreen({ navigation }) {
     },
   }
 
+  // Ajuste o estado inicial do panX
+  useEffect(() => {
+    panX.setValue(-tabs.indexOf(activeTab) * width)
+  }, [])
+
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Início</Text>
+    <View style={createStyles(theme).container}>
+      <View style={createStyles(theme).header}>
+        <Text style={createStyles(theme).title}>Início</Text>
       </View>
 
-      <View style={styles.tabContainer}>
+      <View style={createStyles(theme).tabContainer}>
         {tabs.map((tab) => (
           <TouchableOpacity
             key={tab}
-            style={[styles.tab, activeTab === tab && styles.activeTab]}
-            onPress={() => setActiveTab(tab)}
+            style={[createStyles(theme).tab, activeTab === tab && createStyles(theme).activeTab]}
+            onPress={() => switchTab(tab)}
           >
-            <Text style={[styles.tabText, activeTab === tab && styles.activeTabText]}>{tab}</Text>
+            <Text style={[createStyles(theme).tabText, activeTab === tab && createStyles(theme).activeTabText]}>
+              {tab}
+            </Text>
           </TouchableOpacity>
         ))}
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.tabContentContainer}>
-          <Text style={styles.contentTitle}>{tabContent[activeTab].title}</Text>
-          {tabContent[activeTab].content}
-        </View>
-      </ScrollView>
+      {renderContent()}
     </View>
   )
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#F8F9FA",
-  },
-  header: {
-    paddingHorizontal: 24,
-    paddingTop: 60,
-    paddingBottom: 20,
-    backgroundColor: "#FFFFFF",
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: "bold",
-    color: "#1F2937",
-  },
-  tabContainer: {
-    flexDirection: "row",
-    backgroundColor: "#FFFFFF",
-    paddingHorizontal: 24,
-    paddingBottom: 16,
-  },
-  tab: {
-    flex: 1,
-    alignItems: "center",
-    paddingVertical: 12,
-    marginHorizontal: 4,
-    borderRadius: 8,
-  },
-  activeTab: {
-    backgroundColor: "#EDE9FE",
-  },
-  tabText: {
-    fontSize: 16,
-    fontWeight: "500",
-    color: "#9CA3AF",
-  },
-  activeTabText: {
-    color: "#8B5CF6",
-    fontWeight: "600",
-  },
-  content: {
-    flex: 1,
-  },
-  tabContentContainer: {
-    padding: 24,
-  },
-  contentTitle: {
-    fontSize: 28,
-    fontWeight: "bold",
-    color: "#8B5CF6",
-    marginBottom: 24,
-  },
-  journalImageContainer: {
-    alignItems: "center",
-    marginBottom: 24,
-  },
-  journalImagePlaceholder: {
-    width: "100%",
-    height: 200,
-    backgroundColor: "#F3F4F6",
-    borderRadius: 16,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 16,
-  },
-  journalDescription: {
-    fontSize: 16,
-    lineHeight: 24,
-    color: "#374151",
-    textAlign: "justify",
-  },
-  patchNotesContainer: {
-    gap: 16,
-  },
-  patchNoteCard: {
-    backgroundColor: "#EDE9FE",
-    borderRadius: 16,
-    padding: 20,
-  },
-  patchVersion: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#1F2937",
-    marginBottom: 12,
-  },
-  patchItem: {
-    fontSize: 16,
-    color: "#374151",
-    marginBottom: 8,
-    lineHeight: 22,
-  },
-  eventsContainer: {
-    gap: 20,
-  },
-  eventCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    padding: 20,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  eventImageContainer: {
-    alignItems: "center",
-    marginBottom: 16,
-  },
-  eventImagePlaceholder: {
-    width: "100%",
-    height: 120,
-    backgroundColor: "#F3F4F6",
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  eventContent: {
-    alignItems: "center",
-  },
-  eventTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#1F2937",
-    marginBottom: 8,
-    textAlign: "center",
-  },
-  eventDate: {
-    fontSize: 16,
-    color: "#8B5CF6",
-    marginBottom: 12,
-    fontWeight: "500",
-  },
-  eventDescription: {
-    fontSize: 16,
-    color: "#6B7280",
-    textAlign: "center",
-    lineHeight: 22,
-  },
-})

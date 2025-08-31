@@ -4,7 +4,6 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs"
 import { createStackNavigator } from "@react-navigation/stack"
 import { StatusBar } from "expo-status-bar"
 import { View, StyleSheet } from "react-native"
-import { Ionicons } from "@expo/vector-icons"
 
 import LoginScreen from "./src/screens/LoginScreen"
 import HomeScreen from "./src/screens/HomeScreen"
@@ -13,6 +12,8 @@ import ChatScreen from "./src/screens/ChatScreen"
 import ProfileScreen from "./src/screens/ProfileScreen"
 import NotesScreen from "./src/screens/NotesScreen"
 import WellnessScreen from "./src/screens/WellnessScreen"
+
+import FloatingTabBar from "./src/components/FloatingTabBar"
 
 // Import theme context
 import { ThemeProvider, useTheme } from "./src/context/ThemeContext"
@@ -26,47 +27,10 @@ function TabNavigator() {
 
   return (
     <Tab.Navigator
-      screenOptions={({ route }) => ({
-        tabBarIcon: ({ focused, color, size }) => {
-          let iconName
-
-          if (route.name === "Home") {
-            iconName = focused ? "home" : "home-outline"
-          } else if (route.name === "Calendar") {
-            iconName = focused ? "calendar" : "calendar-outline"
-          } else if (route.name === "Chat") {
-            iconName = focused ? "chatbubble" : "chatbubble-outline"
-          } else if (route.name === "Profile") {
-            iconName = focused ? "person" : "person-outline"
-          } else if (route.name === "Notes") {
-            iconName = focused ? "book" : "book-outline"
-          } else if (route.name === "Wellness") {
-            iconName = focused ? "fitness" : "fitness-outline"
-          }
-
-          return <Ionicons name={iconName} size={size} color={color} />
-        },
-        tabBarActiveTintColor: "#8B5CF6",
-        tabBarInactiveTintColor: isDark ? "#9CA3AF" : "#6B7280",
-        tabBarStyle: {
-          backgroundColor: theme.colors.surface,
-          borderTopColor: theme.colors.border,
-          borderTopWidth: 1,
-          paddingBottom: 8,
-          paddingTop: 8,
-          height: 70,
-          shadowColor: "#000",
-          shadowOffset: { width: 0, height: -2 },
-          shadowOpacity: 0.1,
-          shadowRadius: 4,
-          elevation: 8,
-        },
-        tabBarLabelStyle: {
-          fontSize: 12,
-          fontWeight: "500",
-        },
+      tabBar={(props) => <FloatingTabBar {...props} />}
+      screenOptions={{
         headerShown: false,
-      })}
+      }}
     >
       <Tab.Screen name="Home" component={HomeScreen} options={{ tabBarLabel: "Início" }} />
       <Tab.Screen name="Calendar" component={CalendarScreen} options={{ tabBarLabel: "Calendário" }} />

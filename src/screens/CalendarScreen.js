@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions } from "react-native"
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions, Modal, TextInput, Alert } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { useTheme } from "../context/ThemeContext"
 import AsyncStorage from "@react-native-async-storage/async-storage"
@@ -13,6 +13,13 @@ export default function CalendarScreen() {
   const [currentMonth, setCurrentMonth] = useState(new Date())
   const [selectedDay, setSelectedDay] = useState(new Date())
   const [events, setEvents] = useState([])
+  const [showAddModal, setShowAddModal] = useState(false)
+  const [newReminder, setNewReminder] = useState({
+    title: "",
+    description: "",
+    type: "reminder",
+    time: "",
+  })
 
   useEffect(() => {
     loadEvents()
@@ -29,6 +36,51 @@ export default function CalendarScreen() {
     }
   }
 
+  const saveEvents = async (updatedEvents) => {
+    try {
+      await AsyncStorage.setItem("etecnotes-events", JSON.stringify(updatedEvents))
+      setEvents(updatedEvents)
+    } catch (error) {
+      console.error("Error saving events:", error)
+    }
+  }
+
+  const addReminder = () => {
+    if (!newReminder.title.trim()) {
+      Alert.alert("Erro", "Por favor, digite um título para o lembrete")
+      return
+    }
+
+    const reminder = {
+      id: Date.now().toString(),
+      title: newReminder.title,
+      description: newReminder.description,
+      type: newReminder.type,
+      time: newReminder.time,
+      date: selectedDay.toISOString(),
+    }
+
+    const updatedEvents = [...events, reminder]
+    saveEvents(updatedEvents)
+
+    setNewReminder({ title: "", description: "", type: "reminder", time: "" })
+    setShowAddModal(false)
+  }
+
+  const deleteReminder = (reminderId) => {
+    Alert.alert("Confirmar exclusão", "Tem certeza que deseja excluir este lembrete?", [
+      { text: "Cancelar", style: "cancel" },
+      {
+        text: "Excluir",
+        style: "destructive",
+        onPress: () => {
+          const updatedEvents = events.filter((event) => event.id !== reminderId)
+          saveEvents(updatedEvents)
+        },
+      },
+    ])
+  }
+
   const getDaysInMonth = (date) => {
     const year = date.getFullYear()
     const month = date.getMonth()
@@ -36,13 +88,11 @@ export default function CalendarScreen() {
     const firstDayOfMonth = new Date(year, month, 1).getDay()
     const days = []
 
-    // Previous month days
     for (let i = 0; i < firstDayOfMonth; i++) {
       const prevMonthDay = new Date(year, month, 0 - (firstDayOfMonth - i - 1))
       days.push({ date: prevMonthDay, isCurrentMonth: false })
     }
 
-    // Current month days
     for (let i = 1; i <= daysInMonth; i++) {
       const day = new Date(year, month, i)
       const dayEvents = events.filter((event) => {
@@ -109,10 +159,12 @@ export default function CalendarScreen() {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Calendário</Text>
+        <TouchableOpacity style={styles.addButton} onPress={() => setShowAddModal(true)}>
+          <Ionicons name="add" size={24} color="white" />
+        </TouchableOpacity>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Calendar Header */}
         <View style={styles.calendarHeader}>
           <TouchableOpacity onPress={() => navigateMonth(-1)} style={styles.navButton}>
             <Ionicons name="chevron-back" size={24} color={theme.colors.primary} />
@@ -127,9 +179,7 @@ export default function CalendarScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Calendar Grid */}
         <View style={styles.calendar}>
-          {/* Week days */}
           <View style={styles.weekDays}>
             {["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"].map((day, index) => (
               <Text key={index} style={styles.weekDay}>
@@ -138,7 +188,6 @@ export default function CalendarScreen() {
             ))}
           </View>
 
-          {/* Calendar days */}
           <View style={styles.daysGrid}>
             {days.map((day, index) => (
               <TouchableOpacity
@@ -162,7 +211,6 @@ export default function CalendarScreen() {
                   {day.date.getDate()}
                 </Text>
 
-                {/* Event indicators */}
                 <View style={styles.indicators}>
                   {day.hasEvent && <View style={[styles.indicator, { backgroundColor: "#00B2FF" }]} />}
                   {day.hasReminder && <View style={[styles.indicator, { backgroundColor: "#8C43FF" }]} />}
@@ -174,7 +222,6 @@ export default function CalendarScreen() {
           </View>
         </View>
 
-        {/* Selected Day Events */}
         <View style={styles.eventsSection}>
           <Text style={styles.eventsTitle}>
             {selectedDay.toLocaleDateString("pt-BR", {
@@ -210,6 +257,9 @@ export default function CalendarScreen() {
                     }
                   />
                   <Text style={styles.eventTitle}>{event.title}</Text>
+                  <TouchableOpacity onPress={() => deleteReminder(event.id)} style={styles.deleteButton}>
+                    <Ionicons name="trash-outline" size={16} color={theme.colors.error} />
+                  </TouchableOpacity>
                 </View>
                 {event.time && <Text style={styles.eventTime}>{event.time}</Text>}
                 {event.description && <Text style={styles.eventDescription}>{event.description}</Text>}
@@ -219,11 +269,13 @@ export default function CalendarScreen() {
             <View style={styles.noEvents}>
               <Ionicons name="calendar-outline" size={48} color={theme.colors.textSecondary} />
               <Text style={styles.noEventsText}>Nenhum evento neste dia</Text>
+              <TouchableOpacity style={styles.addEventButton} onPress={() => setShowAddModal(true)}>
+                <Text style={styles.addEventButtonText}>Adicionar lembrete</Text>
+              </TouchableOpacity>
             </View>
           )}
         </View>
 
-        {/* Legend */}
         <View style={styles.legend}>
           <Text style={styles.legendTitle}>Legenda</Text>
           <View style={styles.legendItems}>
@@ -246,6 +298,119 @@ export default function CalendarScreen() {
           </View>
         </View>
       </ScrollView>
+
+      <Modal
+        visible={showAddModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowAddModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: theme.colors.surface }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Novo Lembrete</Text>
+              <TouchableOpacity onPress={() => setShowAddModal(false)}>
+                <Ionicons name="close" size={24} color={theme.colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={[styles.modalDate, { color: theme.colors.textSecondary }]}>
+              {selectedDay.toLocaleDateString("pt-BR", {
+                weekday: "long",
+                day: "numeric",
+                month: "long",
+                year: "numeric",
+              })}
+            </Text>
+
+            <TextInput
+              style={[
+                styles.input,
+                {
+                  backgroundColor: theme.colors.background,
+                  borderColor: theme.colors.border,
+                  color: theme.colors.text,
+                },
+              ]}
+              placeholder="Título do lembrete"
+              placeholderTextColor={theme.colors.textSecondary}
+              value={newReminder.title}
+              onChangeText={(text) => setNewReminder({ ...newReminder, title: text })}
+            />
+
+            <TextInput
+              style={[
+                styles.input,
+                styles.textArea,
+                {
+                  backgroundColor: theme.colors.background,
+                  borderColor: theme.colors.border,
+                  color: theme.colors.text,
+                },
+              ]}
+              placeholder="Descrição (opcional)"
+              placeholderTextColor={theme.colors.textSecondary}
+              value={newReminder.description}
+              onChangeText={(text) => setNewReminder({ ...newReminder, description: text })}
+              multiline
+              numberOfLines={3}
+            />
+
+            <TextInput
+              style={[
+                styles.input,
+                {
+                  backgroundColor: theme.colors.background,
+                  borderColor: theme.colors.border,
+                  color: theme.colors.text,
+                },
+              ]}
+              placeholder="Horário (opcional)"
+              placeholderTextColor={theme.colors.textSecondary}
+              value={newReminder.time}
+              onChangeText={(text) => setNewReminder({ ...newReminder, time: text })}
+            />
+
+            <Text style={[styles.typeLabel, { color: theme.colors.text }]}>Tipo:</Text>
+            <View style={styles.typeButtons}>
+              {[
+                { key: "reminder", label: "Lembrete", color: "#8C43FF", icon: "notifications" },
+                { key: "exam", label: "Prova", color: "#FF4D4D", icon: "school" },
+                { key: "event", label: "Evento", color: "#00B2FF", icon: "calendar" },
+                { key: "note", label: "Nota", color: "#4CAF50", icon: "document-text" },
+              ].map((type) => (
+                <TouchableOpacity
+                  key={type.key}
+                  style={[
+                    styles.typeButton,
+                    { borderColor: type.color },
+                    newReminder.type === type.key && { backgroundColor: type.color + "20" },
+                  ]}
+                  onPress={() => setNewReminder({ ...newReminder, type: type.key })}
+                >
+                  <Ionicons name={type.icon} size={16} color={type.color} />
+                  <Text style={[styles.typeButtonText, { color: type.color }]}>{type.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton, { borderColor: theme.colors.border }]}
+                onPress={() => setShowAddModal(false)}
+              >
+                <Text style={[styles.cancelButtonText, { color: theme.colors.textSecondary }]}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.saveButton, { backgroundColor: theme.colors.primary }]}
+                onPress={addReminder}
+              >
+                <Text style={styles.saveButtonText}>Salvar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   )
 }
@@ -257,6 +422,9 @@ const createStyles = (theme) =>
       backgroundColor: theme.colors.background,
     },
     header: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
       paddingHorizontal: 24,
       paddingTop: 60,
       paddingBottom: 24,
@@ -265,6 +433,119 @@ const createStyles = (theme) =>
       fontSize: 32,
       fontWeight: "bold",
       color: theme.colors.text,
+    },
+    addButton: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      backgroundColor: theme.colors.primary,
+      alignItems: "center",
+      justifyContent: "center",
+      shadowColor: theme.colors.primary,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 8,
+      elevation: 8,
+    },
+    deleteButton: {
+      padding: 4,
+    },
+    addEventButton: {
+      marginTop: 16,
+      paddingVertical: 12,
+      paddingHorizontal: 24,
+      backgroundColor: theme.colors.primary,
+      borderRadius: 8,
+    },
+    addEventButtonText: {
+      color: "white",
+      fontSize: 16,
+      fontWeight: "500",
+    },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: "rgba(0,0,0,0.5)",
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    modalContent: {
+      width: width - 48,
+      borderRadius: 16,
+      padding: 24,
+      maxHeight: "80%",
+    },
+    modalHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 8,
+    },
+    modalTitle: {
+      fontSize: 20,
+      fontWeight: "bold",
+    },
+    modalDate: {
+      fontSize: 14,
+      marginBottom: 24,
+      textTransform: "capitalize",
+    },
+    input: {
+      borderWidth: 1,
+      borderRadius: 8,
+      padding: 12,
+      fontSize: 16,
+      marginBottom: 16,
+    },
+    textArea: {
+      height: 80,
+      textAlignVertical: "top",
+    },
+    typeLabel: {
+      fontSize: 16,
+      fontWeight: "500",
+      marginBottom: 12,
+    },
+    typeButtons: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 8,
+      marginBottom: 24,
+    },
+    typeButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderRadius: 20,
+      borderWidth: 1,
+      gap: 6,
+    },
+    typeButtonText: {
+      fontSize: 14,
+      fontWeight: "500",
+    },
+    modalButtons: {
+      flexDirection: "row",
+      gap: 12,
+    },
+    modalButton: {
+      flex: 1,
+      paddingVertical: 12,
+      borderRadius: 8,
+      alignItems: "center",
+    },
+    cancelButton: {
+      borderWidth: 1,
+    },
+    saveButton: {},
+    cancelButtonText: {
+      fontSize: 16,
+      fontWeight: "500",
+    },
+    saveButtonText: {
+      color: "white",
+      fontSize: 16,
+      fontWeight: "500",
     },
     calendarHeader: {
       flexDirection: "row",
